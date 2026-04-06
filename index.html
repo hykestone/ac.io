@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平均数的再认识 - 测试成绩分析工具</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- SheetJS (XLSX) 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- 统一的 Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#F59E0B',
+                        accent: '#EF4444',
+                        light: '#F3F4F6',
+                        dark: '#1F2937'
+                    },
+                    fontFamily: {
+                        sans: ['Arial Rounded MT Bold', 'Varela Round', 'sans-serif'],
+                    },
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                        'pulse-slow': 'pulse 3s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            }
+            .card-shadow {
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .btn-pop {
+                transition: all 0.2s;
+            }
+            .btn-pop:hover {
+                transform: translateY(-2px);
+            }
+            .btn-pop:active {
+                transform: translateY(1px);
+            }
+            .bg-pattern {
+                background-image: url('https://p3-flow-imagex-sign.byteimg.com/tos-cn-i-a9rns2rl98/rc/pc/super_tool/6c7b92657f114202aeeda30562636943~tplv-a9rns2rl98-image.image?rcl=202511032318026396C844594E930CBDF3&rk3s=8e244e95&rrcfp=f06b921b&x-expires=1764775090&x-signature=g1LohwPLVasylbZmFsVQjy%2B4RIw%3D');
+                background-size: cover;
+                background-position: center;
+            }
+            .table-row-animation {
+                animation: fadeIn 0.5s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .bar-animation {
+                animation: grow 0.5s ease-out;
+            }
+            @keyframes grow {
+                from { height: 0; }
+                to { height: 100%; }
+            }
+            .avg-line-animation {
+                animation: pulse 1.5s ease-in-out;
+            }
+            @keyframes pulse {
+                0%, 100% { opacity: 0.7; }
+                50% { opacity: 1; }
+            }
+        }
+    </style>
+</head>
+<body class="bg-pattern min-h-screen font-sans">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+
+        <!-- 主要内容区域 -->
+        <div class="flex flex-col lg:flex-row gap-6">
+            <!-- 左侧：数据表格 -->
+            <div class="lg:w-1/3 bg-white bg-opacity-90 rounded-xl p-6 card-shadow flex flex-col min-h-[500px]">
+                <h2 class="text-2xl font-bold text-secondary mb-4 flex items-center">
+                    <i class="fa fa-table mr-2"></i>测试成绩记录
+                </h2>
+                <div class="overflow-x-auto overflow-y-auto" style="max-height: 700px;">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-primary text-white sticky top-0">
+                                <th class="border border-gray-300 px-3 py-1 text-sm rounded-tl-lg">序号</th>
+                                <th class="border border-gray-300 px-3 py-1 text-sm">测试成绩</th>
+                                <th class="border border-gray-300 px-3 py-1 text-sm rounded-tr-lg">当前平均数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body">
+                            <!-- 数据行将通过JavaScript动态添加 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 space-y-4">
+                    <!-- 第一行按钮：随机增加、重置数据 -->
+                    <div class="flex flex-wrap justify-center gap-4">
+                        <button id="random-add-btn" class="bg-secondary hover:bg-yellow-500 text-white font-bold py-3 px-6 rounded-lg btn-pop flex items-center whitespace-nowrap">
+                            <i class="fa fa-random mr-2"></i>随机增加
+                        </button>
+                        <button id="reset-btn" class="bg-accent hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg btn-pop flex items-center whitespace-nowrap">
+                            <i class="fa fa-refresh mr-2"></i>重置数据
+                        </button>
+                    </div>
+                    
+                    <!-- 第二行按钮：导入数据、导出数据 -->
+                    <div class="flex flex-wrap justify-center gap-4">
+                        <div class="relative">
+                            <button id="import-btn" class="bg-primary hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg btn-pop flex items-center whitespace-nowrap">
+                                <i class="fa fa-upload mr-2"></i>导入数据
+                            </button>
+                            <input type="file" id="file-input" accept=".xls,.xlsx" class="absolute inset-0 opacity-0 cursor-pointer" />
+                        </div>
+                        <button id="export-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg btn-pop flex items-center whitespace-nowrap">
+                            <i class="fa fa-download mr-2"></i>导出数据
+                        </button>
+                    </div>
+                    
+                    <!-- 第三行按钮：手动增加的两个按钮 -->
+                    <div class="flex flex-wrap justify-center gap-4">
+                        <button id="manual-add-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg btn-pop flex items-center whitespace-nowrap">
+                            <i class="fa fa-plus-circle mr-2"></i>手动增加（1组）
+                        </button>
+                        <button id="manual-add-multi-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg btn-pop flex items-center whitespace-nowrap">
+                            <i class="fa fa-plus-square mr-2"></i>手动增加（多组）
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：统计图和计算过程 -->
+            <div class="lg:w-2/3 flex flex-col gap-6">
+                <!-- 统计图 -->
+                <div class="bg-white bg-opacity-90 rounded-xl p-6 card-shadow">
+                    <h2 class="text-2xl font-bold text-secondary mb-4 flex items-center">
+                        <i class="fa fa-bar-chart mr-2"></i>成绩数据统计图
+                    </h2>
+                    <div class="h-80">
+                        <canvas id="data-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 平均数变化趋势图 -->
+                <div class="bg-white bg-opacity-90 rounded-xl p-6 card-shadow">
+                    <h2 class="text-2xl font-bold text-secondary mb-4 flex items-center">
+                        <i class="fa fa-line-chart mr-2"></i>平均数变化趋势
+                    </h2>
+                    <div class="h-80">
+                        <canvas id="average-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 操作提示 -->
+                <div class="bg-white bg-opacity-90 rounded-xl p-6 card-shadow">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fa fa-info-circle text-blue-500 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-blue-800 mb-1">操作提示</h3>
+                            <div class="text-sm text-blue-700 space-y-1">
+                                <p><span class="font-medium text-secondary">随机增加</span> - 自动生成60-100之间的随机成绩，1-4组内可能出现1-10的极端值</p>
+                                <p><span class="font-medium text-green-500">手动增加（1组）</span> - 手动输入1-100之间的成绩</p>
+                                <p><span class="font-medium text-indigo-500">手动增加（多组）</span> - 批量输入多组成绩，用空格分隔，支持1-100之间的整数或1-2位小数</p>
+                                <p><span class="font-medium text-accent">重置数据</span> - 清除所有数据，重新开始</p>
+                                <p><span class="font-medium text-primary">导入数据</span> - 从Excel文件导入成绩数据（仅支持第一列数字）</p>
+                                <p><span class="font-medium text-purple-500">导出数据</span> - 将当前成绩数据导出为Excel文件，包含序号、成绩和平均数，所有内容居中对齐</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        // 全局变量
+        let dataPoints = [];
+        let averages = []; // 存储每次的平均数
+        let chart; // 柱状图
+        let averageChart; // 平均数折线图
+        let dataCount = 0;
+        const extremeValues = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // 极端值范围1-10
+        let animationId = null; // 动画ID，用于取消之前的动画
+        let nextExtremePosition = null; // 下一个极端值的位置
+
+        // DOM元素
+        const dataTableBody = document.getElementById('data-table-body');
+        const randomAddBtn = document.getElementById('random-add-btn');
+        const manualAddBtn = document.getElementById('manual-add-btn');
+        const manualAddMultiBtn = document.getElementById('manual-add-multi-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const importBtn = document.getElementById('import-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const fileInput = document.getElementById('file-input');
+
+        // 初始化图表
+        function initCharts() {
+            // 初始化柱状图
+            const ctx = document.getElementById('data-chart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '测试成绩',
+                        data: [],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 10
+                            },
+                            title: {
+                                display: true,
+                                text: '成绩/分',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '组数/组',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `成绩: ${context.raw}分`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1000
+                    }
+                }
+            });
+            
+            // 初始化平均数折线图
+            const avgCtx = document.getElementById('average-chart').getContext('2d');
+            averageChart = new Chart(avgCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '平均数',
+                        data: [],
+                        backgroundColor: 'rgba(239, 68, 68, 0)', // 透明背景
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                        pointRadius: 4,
+                        tension: 0, // 直线连接
+                        fill: false // 不填充
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 10
+                            },
+                            title: {
+                                display: true,
+                                text: '平均数',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '组数/组',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `平均数: ${context.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1000
+                    }
+                }
+            });
+        }
+
+        // 生成随机数据
+        function generateRandomData() {
+            dataCount++;
+            
+            // 如果是第一次添加数据，或者已经过了上次极端值的位置，则随机确定下一个极端值的位置
+            if (nextExtremePosition === null || dataCount > nextExtremePosition) {
+                // 随机确定下一个极端值的位置，在当前位置+1到+4之间
+                nextExtremePosition = dataCount + Math.floor(Math.random() * 4) + 1;
+            }
+            
+            // 如果当前位置是极端值位置，则生成极端值
+            if (dataCount === nextExtremePosition) {
+                const randomExtreme = extremeValues[Math.floor(Math.random() * extremeValues.length)];
+                return randomExtreme;
+            } else {
+                // 生成60-100的随机整数
+                return Math.floor(Math.random() * 41) + 60;
+            }
+        }
+
+        // 添加数据到表格
+        function addDataToTable(data) {
+            const row = document.createElement('tr');
+            row.className = 'table-row-animation';
+            
+            // 计算当前平均数
+            const average = calculateAverage();
+            
+            // 检查是否是极端数据
+            const isExtreme = data >= 1 && data <= 10;
+            
+            row.innerHTML = `
+                <td class="border border-gray-300 px-3 py-1 text-center text-sm">${dataPoints.length}</td>
+                <td class="border border-gray-300 px-3 py-1 text-center font-bold text-sm ${isExtreme ? 'text-accent' : ''}">${data}</td>
+                <td class="border border-gray-300 px-3 py-1 text-center font-bold text-sm ${isExtreme ? 'text-accent' : ''}">${average.toFixed(2)}</td>
+            `;
+            dataTableBody.appendChild(row);
+        }
+
+        // 更新图表
+        function updateCharts(drawLine = true) {
+            // 更新柱状图
+            chart.data.labels.push(dataPoints.length);
+            chart.data.datasets[0].data.push(dataPoints[dataPoints.length - 1]);
+            
+            // 计算平均数
+            const average = calculateAverage();
+            averages.push(average);
+            
+            // 更新平均数折线图
+            averageChart.data.labels.push(dataPoints.length);
+            averageChart.data.datasets[0].data.push(average);
+            
+            // 更新图表
+            chart.update();
+            averageChart.update();
+            
+            // 绘制平均数线（默认绘制，批量添加时可选择不绘制）
+            if (drawLine) {
+                drawAverageLine(average);
+            }
+        }
+
+        // 计算平均数
+        function calculateAverage() {
+            if (dataPoints.length === 0) return 0;
+            const sum = dataPoints.reduce((total, current) => total + current, 0);
+            return sum / dataPoints.length;
+        }
+
+        // 绘制平均数线
+        function drawAverageLine(average) {
+            // 获取图表上下文
+            const ctx = chart.ctx;
+            const yAxis = chart.scales.y;
+            const xAxis = chart.scales.x;
+            
+            // 计算线的位置
+            const yPixel = yAxis.getPixelForValue(average);
+            
+            // 保存当前状态
+            ctx.save();
+            
+            // 绘制线
+            ctx.beginPath();
+            ctx.moveTo(xAxis.left, yPixel);
+            ctx.lineTo(xAxis.right, yPixel);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(239, 68, 68, 1)'; // 纯红色
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            
+            // 绘制标签
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = 'rgba(239, 68, 68, 1)';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            
+            const labelText = `平均数: ${average.toFixed(2)}`;
+            const labelWidth = ctx.measureText(labelText).width + 10;
+            const labelHeight = 20;
+            
+            // 标签背景
+            ctx.fillRect(xAxis.left + 5, yPixel - labelHeight / 2, labelWidth, labelHeight);
+            ctx.fillStyle = 'white';
+            ctx.fillText(labelText, xAxis.left + 10, yPixel);
+            
+            // 恢复状态
+            ctx.restore();
+        }
+
+        
+
+        // 重置功能（带确认）
+        function resetAll() {
+            if (confirm('确定要重置数据吗？此操作不可撤销。')) {
+                resetData();
+            }
+        }
+        
+        // 重置数据（不带确认，用于导入数据前）
+        function resetData() {
+            // 取消动画
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            dataPoints = [];
+            averages = [];
+            dataCount = 0;
+            nextExtremePosition = null;
+            dataTableBody.innerHTML = '';
+            
+            // 重置图表
+            chart.data.labels = [];
+            chart.data.datasets[0].data = [];
+            chart.update();
+            
+            // 重置平均数折线图
+            averageChart.data.labels = [];
+            averageChart.data.datasets[0].data = [];
+            averageChart.update();
+            
+
+            
+            // 重新初始化图表以确保正确显示
+            setTimeout(() => {
+                chart.options.scales.y.max = 100;
+                chart.update();
+                averageChart.options.scales.y.max = 100;
+                averageChart.update();
+            }, 100);
+        }
+        
+        // 验证是否为数字（整数或1-2位小数）
+        function isNumber(value) {
+            return /^\d+(\.\d{1,2})?$/.test(value);
+        }
+        
+        // 导入Excel数据
+        function importExcelData(file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 获取第一个工作表
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    
+                    // 将工作表转换为数组（只获取第一列数据）
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    // 验证数据
+                    const validData = [];
+                    let hasError = false;
+                    
+                    for (let i = 0; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        const cellValue = row[0]; // 获取第一列数据
+                        
+                        // 跳过空行
+                        if (cellValue === undefined || cellValue === null || cellValue === '') {
+                            continue;
+                        }
+                        
+                        // 验证是否是否为数字
+                        if (!isNumber(cellValue)) {
+                            alert(`导入失败！在第 ${i + 1} 行发现非数字数据: ${cellValue}`);
+                            hasError = true;
+                            break;
+                        }
+                        
+                        // 转换为数字并验证范围
+                        const numberValue = Number(cellValue);
+                        if (numberValue < 0 || numberValue > 100) {
+                            alert(`导入失败！在第 ${i + 1} 行发现超出范围的数据: ${numberValue}。数据应在0-100之间。`);
+                            hasError = true;
+                            break;
+                        }
+                        
+                        validData.push(numberValue);
+                    }
+                    
+                    if (hasError) {
+                        return;
+                    }
+                    
+                    if (validData.length === 0) {
+                        alert('导入失败！未找到到有效的数据。');
+                        return;
+                    }
+                    
+                    // 确认导入
+                    if (!confirm(`解析 ${validData.length} 条数据，将清除现有数据并导入新数据，是否继续？`)) {
+                        return;
+                    }
+                    
+                    // 重置现有现有数据（无确认）
+                    resetData();
+                    
+                    // 导入数据
+                    dataPoints = [...validData];
+                    dataCount = dataPoints.length;
+                    
+                    // 更新表格
+                    dataTableBody.innerHTML = '';
+                    dataPoints.forEach((data, index) => {
+                        const average = calculateAverageForN(index + 1); // 计算到当前数据的平均数
+                        averages.push(average);
+                        
+                        const row = document.createElement('tr');
+                        row.className = 'table-row-animation';
+                        
+                        // 检查是否是极端数据
+                        const isExtreme = data >= 1 && data <= 10;
+                        
+                        row.innerHTML = `
+                            <td class="border border-gray-300 px-3 py-1.5 text-center text-sm">${index + 1}</td>
+                            <td class="border border-gray-300 px-3 py-1.5 text-center font-bold text-sm ${isExtreme ? 'text-accent' : ''}">${data}</td>
+                            <td class="border border-gray-300 px-3 py-1.5 text-center font-bold text-sm ${isExtreme ? 'text-accent' : ''}">${average.toFixed(2)}</td>
+                        `;
+                        dataTableBody.appendChild(row);
+                    });
+                    
+                    // 更新图表
+                    chart.data.labels = Array.from({ length: dataPoints.length }, (_, i) => i + 1);
+                    chart.data.datasets[0].data = [...dataPoints];
+                    
+                    averageChart.data.labels = Array.from({ length: averages.length }, (_, i) => i + 1);
+                    averageChart.data.datasets[0].data = [...averages];
+                    
+                    chart.update();
+                    averageChart.update();
+                    
+                    // 绘制平均数线（使用最后一个平均数）
+                    if (averages.length > 0) {
+                        drawAverageLine(averages[averages.length - 1]);
+                    }
+                    
+
+                    
+                    alert(`成功导入 ${dataPoints.length} 条数据！`);
+                    
+                } catch (error) {
+                    console.error('导入Excel文件时出错:', error);
+                    alert('导入失败！请确保文件格式正确。');
+                }
+            };
+            
+            reader.onerror = function() {
+                alert('读取文件时出错！');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // 计算前n个数据的平均数
+        function calculateAverageForN(n) {
+            if (n === 0 || dataPoints.length === 0) return 0;
+            const sum = dataPoints.slice(0, n).reduce((total, current) => total + current, 0);
+            return sum / n;
+        }
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 随机增加按钮点击事件
+            randomAddBtn.addEventListener('click', () => {
+                console.log('添加数据按钮被点击');
+                const newData = generateRandomData();
+                dataPoints.push(newData);
+                console.log('新数据:', newData);
+                console.log('数据点数组:', dataPoints);
+                addDataToTable(newData);
+                updateCharts();
+                
+                // 调整Y轴最大值以适应数据，但不超过100
+                if (newData > chart.options.scales.y.max - 5 && chart.options.scales.y.max < 100) {
+                    const newMax = Math.min(100, Math.max(chart.options.scales.y.max, newData + 5));
+                    chart.options.scales.y.max = newMax;
+                    averageChart.options.scales.y.max = newMax;
+                    chart.update();
+                    averageChart.update();
+                }
+                
+                // 调试：检查计算过程是否更新
+                console.log('计算过程HTML:', calculationProcess.innerHTML);
+                console.log('平均数结果显示:', averageResult.style.display);
+            });
+
+            // 重置按钮点击事件
+            resetBtn.addEventListener('click', resetAll);
+            
+            // 手动增加按钮点击事件
+            manualAddBtn.addEventListener('click', () => {
+                console.log('手动增加按钮被点击');
+                
+                // 弹出对话框对话框让用户输入测试成绩
+                const userInput = prompt('请输入测试成绩（范围：1~100，可输入1位或2位小数）：', '');
+                
+                // 检查用户是否取消输入
+                if (userInput === null) {
+                    console.log('用户取消输入');
+                    return;
+                }
+                
+                // 验证输入是否为数字（整数或1-2位小数）
+                if (!isNumber(userInput)) {
+                    alert('输入无效！请输入一个有效的数字，可以是整数或1-2位小数。');
+                    return;
+                }
+                
+                // 转换为数字
+                const score = parseFloat(userInput);
+                
+                // 验证输入范围
+                if (score < 1 || score > 100) {
+                    alert('输入无效！成绩范围必须在1~100之间。');
+                    return;
+                }
+                
+                // 验证通过，添加数据
+                dataPoints.push(score);
+                dataCount++; // 增加数据计数
+                console.log('手动输入数据:', score);
+                console.log('数据点数组:', dataPoints);
+                
+                // 添加数据到表格
+                addDataToTable(score);
+                
+                // 更新图表
+                updateCharts();
+                
+                // 调整Y轴最大值以适应数据，但不超过100
+                if (score > chart.options.scales.y.max - 5 && chart.options.scales.y.max < 100) {
+                    const newMax = Math.min(100, Math.max(chart.options.scales.y.max, score + 5));
+                    chart.options.scales.y.max = newMax;
+                    averageChart.options.scales.y.max = newMax;
+                    chart.update();
+                    averageChart.update();
+                }
+                
+                // 调试：检查计算过程是否更新
+                console.log('计算过程HTML:', calculationProcess.innerHTML);
+                console.log('平均数结果显示:', averageResult.style.display);
+            });
+            
+            // 手动增加（多组）按钮点击事件
+            manualAddMultiBtn.addEventListener('click', function() {
+                console.log('手动增加（多组）按钮被点击');
+                
+                // 弹出对话框让用户输入多组测试成绩
+                let userInput = prompt('请输入多组测试成绩（范围：1~100，可输入1位或2位小数，用空格分隔）：', '');
+                
+                // 检查用户是否取消输入
+                if (userInput === null) {
+                    console.log('用户取消输入');
+                    return;
+                }
+                
+                // 循环直到用户取消或输入完全正确
+                while (true) {
+                    // 检查是否为空输入
+                    if (userInput.trim() === '') {
+                        alert('输入不能为空！请至少输入一个有效的成绩。');
+                        userInput = prompt('请输入多组测试成绩（范围：1~100，可输入1位或2位小数，用空格分隔）：', userInput);
+                        if (userInput === null) return;
+                        continue;
+                    }
+                    
+                    // 按空格分割输入
+                    const inputData = userInput.split(' ');
+                    
+                    // 验证每个数据
+                    let isValid = true;
+                    let errorMessage = '';
+                    let errorIndex = -1;
+                    
+                    for (let i = 0; i < inputData.length; i++) {
+                        const data = inputData[i];
+                        
+                        // 检查是否为空字符串（表示有连续空格）
+                        if (data === '') {
+                            errorMessage = `输入格式错误！在第 ${i+1} 个位置发现连续空格，请确保每个数据之间只使用一个空格分隔。`;
+                            errorIndex = i;
+                            isValid = false;
+                            break;
+                        }
+                        
+                        // 验证是否为数字（整数或1-2位小数）
+                        if (!isNumber(data)) {
+                            errorMessage = `输入无效！在第 ${i+1} 个位置发现非数字数据: "${data}"。请输入有效的数字，可以是整数或1-2位小数。`;
+                            errorIndex = i;
+                            isValid = false;
+                            break;
+                        }
+                        
+                        // 转换为数字
+                        const score = parseFloat(data);
+                        
+                        // 验证输入范围
+                        if (score < 1 || score > 100) {
+                            errorMessage = `输入无效！在第 ${i+1} 个位置的数据 "${data}" 超出范围。成绩范围必须在1~100之间。`;
+                            errorIndex = i;
+                            isValid = false;
+                            break;
+                        }
+                    }
+                    
+                    // 如果有错误
+                    if (!isValid) {
+                        // 显示错误信息
+                        alert(errorMessage);
+                        
+                        // 让用户修改错误，保留之前的输入
+                        userInput = prompt('请修改错误后继续输入：', userInput);
+                        
+                        // 检查用户用户是否取消输入
+                        if (userInput === null) {
+                            console.log('用户取消输入');
+                            return;
+                        }
+                    } else {
+                        // 所有数据验证通过，批量添加数据
+                        const validData = inputData.map(data => parseFloat(data));
+                        console.log('手动输入多组数据:', validData);
+                        
+                        // 批量添加数据到表格和图表
+                        for (const score of validData) {
+                            dataPoints.push(score);
+                            dataCount++; // 增加数据计数
+                            addDataToTable(score);
+                            // 每次添加一个数据点后更新图表，但不绘制平均数线
+                            updateCharts(false);
+                        }
+                        
+                        // 所有数据添加完成后，手动绘制一次平均数线
+                        const finalAverage = calculateAverage();
+                        drawAverageLine(finalAverage);
+                        
+                        // 调整Y轴最大值以适应数据，但不超过100
+                        const maxScore = Math.max(...validData);
+                        if (maxScore > chart.options.scales.y.max - 5 && chart.options.scales.y.max < 100) {
+                            const newMax = Math.min(100, Math.max(chart.options.scales.y.max, maxScore + 5));
+                            chart.options.scales.y.max = newMax;
+                            averageChart.options.scales.y.max = newMax;
+                            chart.update();
+                            averageChart.update();
+                        }
+                        
+                        // 显示成功信息
+                        alert(`成功添加 ${validData.length} 组数据！`);
+                        break; // 退出循环
+                    }
+                }
+            });
+            
+            // 导入数据按钮点击事件
+            importBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // 导出数据按钮点击事件
+            exportBtn.addEventListener('click', function() {
+                console.log('导出数据按钮被点击');
+                
+                // 检查是否有数据可导出
+                if (dataPoints.length === 0) {
+                    alert('没有数据可导出！请先添加一些成绩数据。');
+                    return;
+                }
+                
+                // 准备导出数据
+                // 第一行是表头
+                const exportData = [['序号', '成绩']];
+                
+                // 添加数据行
+                for (let i = 0; i < dataPoints.length; i++) {
+                    exportData.push([i + 1, dataPoints[i]]);
+                }
+                
+                // 添加平均数行
+                const average = calculateAverage();
+                exportData.push(['平均数', average.toFixed(2)]);
+                
+                // 创建工作簿和工作表
+                const ws = XLSX.utils.aoa_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "成绩数据");
+                
+                // 设置单元格样式 - 所有内容居中对齐
+                // 首先，我们需要计算数据范围
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                
+                // 创建样式对象 - 更详细的居中对齐设置
+                const centerAlignment = {
+                    alignment: {
+                        horizontal: 'center',  // 水平居中
+                        vertical: 'center',    // 垂直居中
+                        wrap_text: false       // 不自动换行
+                    },
+                    font: {
+                        name: 'Arial',         // 设置字体
+                        size: 10               // 设置字号
+                    }
+                };
+                
+                // 为每个单元格应用样式
+                for (let R = range.s.r; R <= range.e.r; R++) {
+                    for (let C = range.s.c; C <= range.e.c; C++) {
+                        const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                        
+                        // 如果单元格不存在，则创建一个空单元格
+                        if (!ws[cellAddress]) {
+                            ws[cellAddress] = {t: 's', v: ''};
+                        }
+                        
+                        // 应用居中对齐样式
+                        ws[cellAddress].s = centerAlignment;
+                        
+                        // 对于表头和平均数行，使用加粗字体
+                        if (R === 0 || R === range.e.r) {
+                            ws[cellAddress].s.font.bold = true;
+                        }
+                    }
+                }
+                
+                // 调整列宽 - 两列都设置为10个字符宽度
+                const wscols = [
+                    {wch: 10}, // 序号列宽度
+                    {wch: 10}  // 成绩列宽度
+                ];
+                ws['!cols'] = wscols;
+                
+                // 生成Excel文件并下载
+                // 使用动态文件名，包含当前日期
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                const defaultFileName = `成绩数据_${year}${month}${day}.xlsx`;
+                
+                // 生成Excel文件并下载
+                XLSX.writeFile(wb, defaultFileName);
+                
+                // 显示成功信息
+                alert(`数据导出成功！文件已保存为: ${defaultFileName}\n\n您可以在浏览器的下载文件夹中找到该文件，或通过浏览器的下载对话框选择其他保存位置。`);
+            });
+            
+            // 文件输入变化事件
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // 检查文件类型
+                    const fileExtension = file.name.split('.').pop().toLowerCase();
+                    if (fileExtension !== 'xls' && fileExtension !== 'xlsx') {
+                        alert('请选择Excel文件（.xls或.xlsx格式格式）！');
+                        return;
+                    }
+                    
+                    importExcelData(file);
+                    
+                    // 重置文件输入，以便可以再次选择同一文件
+                    fileInput.value = '';
+                }
+            });
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            initEventListeners();
+        });
+    </script>
+</body>
+</html>

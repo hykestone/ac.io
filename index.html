@@ -176,8 +176,8 @@
                                 <p><span class="font-medium text-green-500">手动增加（1组）</span> - 手动输入1-100之间的数值</p>
                                 <p><span class="font-medium text-indigo-500">手动增加（多组）</span> - 批量输入多组数值，用空格分隔，支持1-100之间的整数或1-2位小数</p>
                                 <p><span class="font-medium text-accent">重置数据</span> - 清除所有数据，重新开始</p>
-                                <p><span class="font-medium text-primary">导入数据</span> - 从Excel文件导入测试数值（仅支持第一列数字）</p>
-                                <p><span class="font-medium text-purple-500">导出数据</span> - 将当前数据导出为Excel文件，包含序号、成绩和平均数，所有内容居中对齐</p>
+                                <p><span class="font-medium text-primary">导入数据</span> - 从Excel文件导入数据（仅支持第一列数字）</p>
+                                <p><span class="font-medium text-purple-500">导出数据</span> - 将当前数据导出为Excel文件，包含序号、数值和平均数，所有内容居中对齐</p>
                             </div>
                         </div>
                     </div>
@@ -238,7 +238,7 @@
                             },
                             title: {
                                 display: true,
-                                text: '成绩/分',
+                                text: '数值/分',
                                 font: {
                                     size: 14,
                                     weight: 'bold'
@@ -263,7 +263,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `成绩: ${context.raw}分`;
+                                    return `数值: ${context.raw}分`;
                                 }
                             }
                         }
@@ -661,8 +661,8 @@
             manualAddBtn.addEventListener('click', () => {
                 console.log('手动增加按钮被点击');
                 
-                // 弹出对话框对话框让用户输入测试成绩
-                const userInput = prompt('请输入测试成绩（范围：1~100，可输入1位或2位小数）：', '');
+                // 弹出对话框对话框让用户输入测试数值
+                const userInput = prompt('请输入测试数值（范围：1~100，可输入1位或2位小数）：', '');
                 
                 // 检查用户是否取消输入
                 if (userInput === null) {
@@ -681,7 +681,7 @@
                 
                 // 验证输入范围
                 if (score < 1 || score > 100) {
-                    alert('输入无效！成绩范围必须在1~100之间。');
+                    alert('输入无效！数值范围必须在1~100之间。');
                     return;
                 }
                 
@@ -715,8 +715,8 @@
             manualAddMultiBtn.addEventListener('click', function() {
                 console.log('手动增加（多组）按钮被点击');
                 
-                // 弹出对话框让用户输入多组测试成绩
-                let userInput = prompt('请输入多组测试成绩（范围：1~100，可输入1位或2位小数，用空格分隔）：', '');
+                // 弹出对话框让用户输入多组测试数值
+                let userInput = prompt('请输入多组测试数值（范围：1~100，可输入1位或2位小数，用空格分隔）：', '');
                 
                 // 检查用户是否取消输入
                 if (userInput === null) {
@@ -728,8 +728,8 @@
                 while (true) {
                     // 检查是否为空输入
                     if (userInput.trim() === '') {
-                        alert('输入不能为空！请至少输入一个有效的成绩。');
-                        userInput = prompt('请输入多组测试成绩（范围：1~100，可输入1位或2位小数，用空格分隔）：', userInput);
+                        alert('输入不能为空！请至少输入一个有效的数值。');
+                        userInput = prompt('请输入多组测试数值（范围：1~100，可输入1位或2位小数，用空格分隔）：', userInput);
                         if (userInput === null) return;
                         continue;
                     }
@@ -766,7 +766,7 @@
                         
                         // 验证输入范围
                         if (score < 1 || score > 100) {
-                            errorMessage = `输入无效！在第 ${i+1} 个位置的数据 "${data}" 超出范围。成绩范围必须在1~100之间。`;
+                            errorMessage = `输入无效！在第 ${i+1} 个位置的数据 "${data}" 超出范围。数值范围必须在1~100之间。`;
                             errorIndex = i;
                             isValid = false;
                             break;
@@ -832,13 +832,13 @@
                 
                 // 检查是否有数据可导出
                 if (dataPoints.length === 0) {
-                    alert('没有数据可导出！请先添加一些成绩数据。');
+                    alert('没有数据可导出！请先添加一些数据。');
                     return;
                 }
                 
                 // 准备导出数据
                 // 第一行是表头
-                const exportData = [['序号', '成绩']];
+                const exportData = [['序号', '数值']];
                 
                 // 添加数据行
                 for (let i = 0; i < dataPoints.length; i++) {
@@ -852,7 +852,7 @@
                 // 创建工作簿和工作表
                 const ws = XLSX.utils.aoa_to_sheet(exportData);
                 const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "成绩数据");
+                XLSX.utils.book_append_sheet(wb, ws, "数据");
                 
                 // 设置单元格样式 - 所有内容居中对齐
                 // 首先，我们需要计算数据范围
@@ -904,7 +904,7 @@
                 const year = today.getFullYear();
                 const month = String(today.getMonth() + 1).padStart(2, '0');
                 const day = String(today.getDate()).padStart(2, '0');
-                const defaultFileName = `成绩数据_${year}${month}${day}.xlsx`;
+                const defaultFileName = `数据_${year}${month}${day}.xlsx`;
                 
                 // 生成Excel文件并下载
                 XLSX.writeFile(wb, defaultFileName);

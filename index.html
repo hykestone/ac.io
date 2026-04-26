@@ -11,7 +11,11 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- 统一的 Tailwind 配置 -->
+    <!-- 隐藏的文件输入框 -->
+    <input type="file" id="excelFileInput" accept=".xlsx,.xls" class="hidden">
+    
     <script>
         tailwind.config = {
             theme: {
@@ -51,7 +55,7 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
-    <div class="container mx-auto px-4 py-8 max-w-7xl">
+    <div class="container mx-auto px-4 py-8 max-w-none">
         <!-- 页面标题 -->
         <header class="mb-8 text-center">
             <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-2">平均数学习工具</h1>
@@ -59,9 +63,9 @@
         </header>
 
         <!-- 主要内容区 -->
-        <main class="flex flex-col lg:flex-row gap-6">
+        <main class="flex flex-col lg:flex-row gap-8">
             <!-- 左侧：数据操作区 -->
-	    <section class="w-full lg:w-[22%] bg-white rounded-xl shadow-card p-6">
+            <section class="w-full lg:w-1/4 bg-white rounded-xl shadow-card p-6 lg:p-8">
                 <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
                     <i class="fa fa-table mr-2 text-primary"></i>数据操作区
                 </h2>
@@ -113,32 +117,39 @@
                             <i class="fa fa-trash-o mr-2"></i>清空&#10;数据
                         </button>
                     </div>
+                    
+                    <!-- 第四行：导入数据 -->
+                    <div class="flex gap-4">
+                        <button id="importBtn" class="flex-1 flex items-center justify-center py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-all-300 btn-hover whitespace-pre-line leading-tight">
+                            <i class="fa fa-upload mr-2"></i>导入&#10;数据
+                        </button>
+                    </div>
                 </div>
             </section>
 
             <!-- 右侧：数据可视化区 -->
-	    <section class="w-full lg:w-[78%] bg-white rounded-xl shadow-card p-6">
+            <section class="w-full lg:w-3/4 flex-1 bg-white rounded-xl shadow-card p-6 lg:p-8">
                 <h2 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
                     <i class="fa fa-bar-chart mr-2 text-primary"></i>数据可视化区
                 </h2>
                 
                 <!-- 图表容器 -->
-                <div class="relative h-[550px] w-full">
+                <div class="relative h-[400px] lg:h-[500px] xl:h-[600px]">
                     <canvas id="dataChart"></canvas>
 
                 </div>
                 
                 <!-- 统计信息 -->
-                <div class="mt-6 grid grid-cols-3 gap-4">
-                    <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-blue-50 p-6 rounded-lg">
                         <h3 class="text-base font-medium text-gray-500 mb-2">数据总和</h3>
                         <p id="sumValue" class="text-3xl font-bold text-primary">0</p>
                     </div>
-                    <div class="bg-orange-50 p-4 rounded-lg">
+                    <div class="bg-orange-50 p-6 rounded-lg">
                         <h3 class="text-base font-medium text-gray-500 mb-2">数据个数</h3>
                         <p id="countValue" class="text-3xl font-bold text-accent">0</p>
                     </div>
-                    <div class="bg-red-50 p-4 rounded-lg">
+                    <div class="bg-red-50 p-6 rounded-lg">
                         <h3 class="text-base font-medium text-gray-500 mb-2">当前平均数</h3>
                         <p id="currentAvgValue" class="text-3xl font-bold text-red-600">0.00</p>
                     </div>
@@ -465,6 +476,8 @@
             deleteIndexInput.value = '';
             modifyIndexInput.value = '';
             modifyValueInput.value = '';
+            importDataInput.value = '';
+            document.getElementById('fileInput').value = '';
         }
 
         // 隐藏所有模态框
@@ -473,6 +486,7 @@
             addMultipleModal.classList.add('hidden');
             deleteModal.classList.add('hidden');
             modifyModal.classList.add('hidden');
+            importModal.classList.add('hidden');
             resetInputs();
         }
 
@@ -570,6 +584,9 @@
             hideAllModals();
             showToast('数据修改成功！');
         }
+        
+// 导入数据功能已移至confirmImport函数
+        
 
         // 随机增加一组数据
         function addRandomData() {
@@ -615,11 +632,16 @@
                 deleteIndexInput.focus();
             });
             
+            importBtn.addEventListener('click', importExcelFile);
+            
             // 随机增加数据按钮事件
             randomAddBtn.addEventListener('click', addRandomData);
             
             // 清空所有数据按钮事件
             clearAllBtn.addEventListener('click', clearAllData);
+            
+            // 导出数据按钮事件
+
             
             modifyBtn.addEventListener('click', () => {
                 if (dataArray.length === 0) {
@@ -676,11 +698,115 @@
             });
         }
 
+        // 导入Excel文件
+        function importExcelFile() {
+            const fileInput = document.getElementById('excelFileInput');
+            
+            // 重置文件输入框，允许选择相同的文件
+            fileInput.value = '';
+            
+            // 触发文件选择对话框
+            fileInput.click();
+        }
+        
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            
+            if (!file) {
+                return;
+            }
+            
+            // 检查文件类型
+            if (!file.name.toLowerCase().match(/\.(xlsx|xls)$/)) {
+                showToast('请选择Excel文件(.xlsx或.xls)', 'error');
+                return;
+            }
+            
+            // 显示加载提示
+            showToast('正在解析Excel文件...', 'info');
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // 将Excel数据转换为JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    // 验证Excel格式
+                    if (!jsonData || jsonData.length < 2) {
+                        showToast('Excel文件格式不正确，需要至少包含标题行和数据行', 'error');
+                        return;
+                    }
+                    
+                    // 检查标题行
+                    const headerRow = jsonData[0];
+                    if (!headerRow || headerRow.length < 2 || headerRow[0] !== '序号' || headerRow[1] !== '数据') {
+                        showToast('Excel格式不正确，第一行应为"序号"和"数据"', 'error');
+                        return;
+                    }
+                    
+                    // 提取数据（从第二行开始）
+                    const values = [];
+                    let invalidCount = 0;
+                    
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (row && row.length >= 2) {
+                            const value = parseFloat(row[1]);
+                            if (!isNaN(value)) {
+                                values.push(value);
+                            } else {
+                                invalidCount++;
+                            }
+                        }
+                    }
+                    
+                    if (values.length === 0) {
+                        showToast('Excel文件中没有有效的数字数据', 'error');
+                        return;
+                    }
+                    
+                    // 添加数据到数组
+                    dataArray.push(...values);
+                    updateAll();
+                    
+                    let message = `成功导入 ${values.length} 组数据！`;
+                    if (invalidCount > 0) {
+                        message += `（已自动过滤 ${invalidCount} 个非数字数据）`;
+                    }
+                    
+                    showToast(message, 'success');
+                    
+                } catch (error) {
+                    console.error('Excel解析错误:', error);
+                    showToast('Excel文件解析失败，请检查文件格式', 'error');
+                }
+            };
+            
+            reader.onerror = function() {
+                showToast('文件读取失败', 'error');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+        
         // 初始化应用
         function initApp() {
             initChart();
             updateAll();
             setupEventListeners();
+            
+            // 绑定文件选择事件
+            const fileInput = document.getElementById('excelFileInput');
+            if (fileInput) {
+                fileInput.addEventListener('change', handleFileSelect);
+            }
             
             // 不添加任何示例数据，保持表格为空
             dataArray = [];
